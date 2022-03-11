@@ -234,6 +234,18 @@ static int lua_kcp_context_nodely(lua_State * L) {
     return 1;
 }
 
+static int lua_kcp_context_minrto(lua_State * L) {
+    ikcpcb* kcp = check_kcp(L, 1);
+    lua_Integer minrto = luaL_checkinteger(L, 2);
+
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+
+    kcp->rx_minrto = (int)minrto;
+    return 0;
+}
+
 static const luaL_Reg lua_kcp_context_functions[] = {
     {"set_output", lua_kcp_context_set_output},
     {"update", lua_kcp_context_update},
@@ -247,6 +259,7 @@ static const luaL_Reg lua_kcp_context_functions[] = {
     {"wndsize", lua_kcp_context_wndsize},
     {"waitsnd", lua_kcp_context_waitsnd},
     {"nodely", lua_kcp_context_nodely},
+    {"minrto", lua_kcp_context_minrto},
     { NULL, NULL }
 };
 
