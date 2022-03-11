@@ -1,3 +1,4 @@
+// kcp-lua封装, 支持多线程调用
 #include <stdio.h>
 #include <limits.h>
 #include <lua.h>
@@ -59,6 +60,19 @@ static int lua_kcp_context_update(lua_State * L) {
     return 0;
 }
 
+static int lua_kcp_context_check(lua_State * L) {
+    ikcpcb* kcp = check_kcp(L, 1);
+    IUINT32 current = (IUINT32)luaL_checkinteger(L, 2);
+
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+
+    IUINT32 nextUpdate = ikcp_check(kcp, current);
+    lua_pushinteger(L, nextUpdate);
+    return 1;
+}
+
 static int lua_kcp_context_input(lua_State * L) {
     ikcpcb* kcp = check_kcp(L, 1);
     size_t len = 0;
@@ -68,7 +82,154 @@ static int lua_kcp_context_input(lua_State * L) {
         return luaL_error(L, "error: kcp context has been release");
 	}
 
-    int ret = ikcp_input(kcp, data, len);
+    if (len > LONG_MAX) {
+        return luaL_error(L, "error: input size too long, more than LONG_MAX");
+    }
+
+    int ret = ikcp_input(kcp, data, (long)len);
+    lua_pushinteger(L, ret);
+    return 1;
+}
+
+static int lua_kcp_context_flush(lua_State * L) {
+    ikcpcb* kcp = check_kcp(L, 1);
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+    ikcp_flush(kcp);
+    return 0;
+}
+
+static int lua_kcp_context_recv(lua_State * L) {
+    lua_settop(L, 2);
+    ikcpcb* kcp = check_kcp(L, 1);
+    int size = 1024;
+    if (lua_isinteger(L, 2)) {
+        lua_Integer tempSize = luaL_checkinteger(L, 2);
+        if (tempSize > INT32_MAX) {
+            return luaL_error(L, "error: buffer size to long, more than INT32_MAX");
+        } else if (tempSize < 0) {
+            return luaL_error(L, "error: buffer size small than 0");
+        }
+        size = (int)tempSize;
+    }
+    
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+
+    int bufferLen = sizeof(char) * size;
+    char * buffer = (char *)malloc(bufferLen);
+    memset(buffer, 0, bufferLen);
+    int ret = ikcp_recv(kcp, buffer, bufferLen);
+    lua_pushinteger(L, ret);
+    if (ret >= 0) {
+        lua_pushlstring(L, buffer, ret);
+    } else {
+        lua_pushnil(L);
+    }
+    free(buffer);
+    return 2;
+}
+
+static int lua_kcp_context_send(lua_State * L) {
+    ikcpcb* kcp = check_kcp(L, 1);
+    size_t len = 0;
+    const char * data = luaL_checklstring(L, 2, &len);
+
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+
+    if (len > INT32_MAX) {
+        return luaL_error(L, "error: input size to long, more than INT32_MAX");
+    }
+
+    int ret = ikcp_send(kcp, data, (int)len);
+    lua_pushinteger(L, ret);
+    return 1;
+}
+
+static int lua_kcp_context_peeksize(lua_State * L) {
+    ikcpcb* kcp = check_kcp(L, 1);
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+
+    int size = ikcp_peeksize(kcp);
+    lua_pushinteger(L, size);
+    return 1;
+}
+
+static int lua_kcp_context_setmtu(lua_State * L) {
+    ikcpcb* kcp = check_kcp(L, 1);
+    lua_Integer mtu = luaL_checkinteger(L, 2);
+
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+
+    if (mtu > INT32_MAX) {
+        return luaL_error(L, "error: mtu too large, more than INT32_MAX");
+    } else if (mtu < INT32_MIN) {
+        return luaL_error(L, "error: mtu too small, less than INT32_MIN");
+    }
+
+    int ret = ikcp_setmtu(kcp, mtu);
+    lua_pushinteger(L, ret);
+    return 1;
+}
+
+static int lua_kcp_context_wndsize(lua_State * L) {
+    ikcpcb* kcp = check_kcp(L, 1);
+    lua_Integer sndwnd = luaL_checkinteger(L, 2);
+    lua_Integer rcvwnd = luaL_checkinteger(L, 3);
+
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+
+    if (sndwnd > INT32_MAX) {
+        return luaL_error(L, "error: sndwnd too large, more than INT32_MAX");
+    } else if (sndwnd < INT32_MIN) {
+        return luaL_error(L, "error: sndwnd too small, less than INT32_MAX");
+    }
+
+    if (rcvwnd > INT32_MAX) {
+        return luaL_error(L, "error: rcvwnd too large, more than INT32_MAX");
+    } else if (rcvwnd < INT32_MIN) {
+        return luaL_error(L, "error: rcvwnd too small, less than INT32_MAX");
+    }
+
+    int ret = ikcp_wndsize(kcp, sndwnd, rcvwnd);
+    lua_pushinteger(L, ret);
+    return 1;
+}
+
+static int lua_kcp_context_waitsnd(lua_State * L) {
+    ikcpcb* kcp = check_kcp(L, 1);
+
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+
+    int ret = ikcp_waitsnd(kcp);
+    lua_pushinteger(L, ret);
+    return 1;
+}
+
+static int lua_kcp_context_nodely(lua_State * L) {
+    ikcpcb* kcp = check_kcp(L, 1);
+    int nodely = (int)luaL_checkinteger(L, 2);
+    int interval = (int)luaL_checkinteger(L, 3);
+    int resend = (int)luaL_checkinteger(L, 4);
+    int nc = (int)luaL_checkinteger(L, 5);
+
+    if (kcp == NULL) {
+        return luaL_error(L, "error: kcp context has been release");
+	}
+
+    int ret = ikcp_nodelay(kcp, nodely, interval, resend, nc);
     lua_pushinteger(L, ret);
     return 1;
 }
@@ -77,6 +238,15 @@ static const luaL_Reg lua_kcp_context_functions[] = {
     {"set_output", lua_kcp_context_set_output},
     {"update", lua_kcp_context_update},
     {"input", lua_kcp_context_input},
+    {"flush", lua_kcp_context_flush},
+    {"recv", lua_kcp_context_recv},
+    {"send", lua_kcp_context_send},
+    {"check", lua_kcp_context_check},
+    {"peeksize", lua_kcp_context_peeksize},
+    {"setmtu", lua_kcp_context_setmtu},
+    {"wndsize", lua_kcp_context_wndsize},
+    {"waitsnd", lua_kcp_context_waitsnd},
+    {"nodely", lua_kcp_context_nodely},
     { NULL, NULL }
 };
 
@@ -109,7 +279,7 @@ static int lua_kcp_context_tostring(lua_State *L)
 }
 
 static int lua_kcp_create_context(lua_State *L) {
-    long long conv = luaL_checkinteger(L, 1);
+    lua_Integer conv = luaL_checkinteger(L, 1);
     if (conv > UINT32_MAX) {
         return luaL_error(L, "error: context id has larger then UINT32_MAX");
     }
