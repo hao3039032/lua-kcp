@@ -218,7 +218,7 @@ static int lua_kcp_context_waitsnd(lua_State * L) {
     return 1;
 }
 
-static int lua_kcp_context_nodely(lua_State * L) {
+static int lua_kcp_context_nodelay(lua_State * L) {
     ikcpcb* kcp = check_kcp(L, 1);
     int nodely = (int)luaL_checkinteger(L, 2);
     int interval = (int)luaL_checkinteger(L, 3);
@@ -258,7 +258,7 @@ static const luaL_Reg lua_kcp_context_functions[] = {
     {"setmtu", lua_kcp_context_setmtu},
     {"wndsize", lua_kcp_context_wndsize},
     {"waitsnd", lua_kcp_context_waitsnd},
-    {"nodely", lua_kcp_context_nodely},
+    {"nodelay", lua_kcp_context_nodelay},
     {"minrto", lua_kcp_context_minrto},
     { NULL, NULL }
 };
