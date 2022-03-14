@@ -327,9 +327,22 @@ static int lua_kcp_create_context(lua_State *L) {
     return 1;
 }
 
+static int lua_kcp_getconv(lua_State *L) {
+    size_t len = 0;
+    const char * data = luaL_checklstring(L, 1, &len);
+
+    if (len < 4) {
+        return luaL_error(L, "error: data len small than 4 bytes, maybe not a kcp message");
+    }
+
+    lua_pushinteger(L, ikcp_getconv(data));
+    return 1;
+}
+
 static const struct luaL_Reg kcp_funcs[] =
 {
     {"create", lua_kcp_create_context},
+    {"getconv", lua_kcp_getconv},
     {NULL, NULL}
 };
 
