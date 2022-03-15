@@ -246,6 +246,26 @@ static int lua_kcp_context_minrto(lua_State * L) {
     return 0;
 }
 
+static int lua_kcp_context_gc(lua_State * L) {
+    ikcpcb** p_kcp = (ikcpcb**)luaL_checkudata(L, 1, "kcp_context");
+    ikcpcb* kcp = *p_kcp;
+	if (kcp == NULL) {
+        return 0;
+	}
+    if (kcp->user != NULL) {
+        struct kcp_callback * c = (struct kcp_callback *)kcp->user;
+        int callback = c->callback;
+        if (callback != LUA_NOREF) {
+            luaL_unref(L, LUA_REGISTRYINDEX, callback);
+        }
+        free(c);
+        kcp->user = NULL;
+    }
+    ikcp_release(kcp);
+    *p_kcp = NULL;
+    return 0;
+}
+
 static const luaL_Reg lua_kcp_context_functions[] = {
     {"set_output", lua_kcp_context_set_output},
     {"update", lua_kcp_context_update},
@@ -260,29 +280,9 @@ static const luaL_Reg lua_kcp_context_functions[] = {
     {"waitsnd", lua_kcp_context_waitsnd},
     {"nodelay", lua_kcp_context_nodelay},
     {"minrto", lua_kcp_context_minrto},
+    {"release", lua_kcp_context_gc},
     { NULL, NULL }
 };
-
-
-
-static int lua_kcp_context_gc(lua_State * L) {
-    ikcpcb* kcp = check_kcp(L, 1);
-	if (kcp == NULL) {
-        return 0;
-	}
-    if (kcp->user != NULL) {
-        struct kcp_callback * c = (struct kcp_callback *)kcp->user;
-        int callback = c->callback;
-        if (callback != LUA_NOREF) {
-            luaL_unref(L, LUA_REGISTRYINDEX, callback);
-        }
-        free(c);
-        kcp->user = NULL;
-    }
-    ikcp_release(kcp);
-    kcp = NULL;
-    return 0;
-}
 
 static int lua_kcp_context_tostring(lua_State *L)
 {
